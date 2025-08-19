@@ -38,6 +38,7 @@ const useWebRTC = (role: Role) => {
         console.log('New ICE candidate:', JSON.stringify(event.candidate));
       }
     };
+    console.log("sdv")
 
     pc.onconnectionstatechange = () => {
       if (pcRef.current) {
