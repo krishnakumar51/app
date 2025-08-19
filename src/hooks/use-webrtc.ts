@@ -91,8 +91,10 @@ const useWebRTC = (role: Role) => {
 
   const setRemoteOffer = React.useCallback(async (sdp: string) => {
     try {
-      const pc = setupPeerConnection();
-      await pc.setRemoteDescription({ type: 'offer', sdp });
+  const pc = setupPeerConnection();
+  console.log('[useWebRTC] setRemoteOffer: incoming offer length=', sdp?.length);
+  await pc.setRemoteDescription({ type: 'offer', sdp });
+  console.log('[useWebRTC] setRemoteOffer: pc.remoteDescription.type=', pc.remoteDescription?.type, 'pc.remoteDescription.sdpLength=', pc.remoteDescription?.sdp?.length);
     } catch(e) {
       console.error("Failed to set remote offer", e);
       toast({ title: "Error setting offer", variant: "destructive" });
@@ -106,9 +108,11 @@ const useWebRTC = (role: Role) => {
         toast({ title: "Remote offer not set", description: "Cannot create an answer without an offer.", variant: "destructive"});
         return;
     }
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    return answer;
+  console.log('[useWebRTC] createAnswer: remoteDescription.sdp length=', pc.remoteDescription?.sdp?.length);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  console.log('[useWebRTC] createAnswer: generated answer.sdp length=', answer?.sdp?.length);
+  return answer;
   }, [setupPeerConnection, toast]);
 
   const setRemoteAnswer = React.useCallback(async (sdp: string) => {
