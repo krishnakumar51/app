@@ -28,7 +28,7 @@ export default function PhoneView() {
   React.useEffect(() => {
     const offerFromUrl = searchParams.get('offer');
     if (offerFromUrl) {
-      setOfferSdp(decodeURIComponent(offerFromUrl));
+      setOfferSdp(offerFromUrl);
       toast({
         title: "Offer Received",
         description: "Offer SDP has been populated from the URL.",
