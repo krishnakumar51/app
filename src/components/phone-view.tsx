@@ -28,7 +28,8 @@ export default function PhoneView() {
   React.useEffect(() => {
     const offerFromUrl = searchParams.get('offer');
     if (offerFromUrl) {
-      setOfferSdp(decodeURIComponent(offerFromUrl));
+      const decodedOffer = decodeURIComponent(offerFromUrl);
+      setOfferSdp(decodedOffer);
       toast({
         title: "Offer Received",
         description: "Offer SDP has been populated from the URL.",
@@ -47,7 +48,9 @@ export default function PhoneView() {
     }
     await setRemoteOffer(offerSdp);
     const answer = await createAnswer();
-    setAnswerSdp(answer?.sdp ?? '');
+    if (answer?.sdp) {
+        setAnswerSdp(answer.sdp);
+    }
   };
 
   const copyToClipboard = (text: string, type: string) => {
