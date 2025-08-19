@@ -23,6 +23,7 @@ export default function LaptopView() {
   React.useEffect(() => {
     const url = new URL(window.location.href);
     url.searchParams.set('role', 'phone');
+    url.searchParams.delete('offer');
     setQrUrl(url.toString());
   }, []);
 
