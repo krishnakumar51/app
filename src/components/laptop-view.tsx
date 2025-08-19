@@ -21,11 +21,9 @@ export default function LaptopView() {
   const [qrUrl, setQrUrl] = React.useState('');
 
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('role', 'phone');
-      setQrUrl(url.toString());
-    }
+    const url = new URL(window.location.href);
+    url.searchParams.set('role', 'phone');
+    setQrUrl(url.toString());
   }, []);
 
   const handleCreateOffer = async () => {
@@ -99,7 +97,7 @@ export default function LaptopView() {
               <p className="text-center text-sm text-muted-foreground">
                 On your phone, go to this page, select "Phone" role, and scan this QR code.
               </p>
-              {qrUrl ? <QRCode value={`${qrUrl}&offer=${encodeURIComponent(offerSdp)}`} size={160} /> : <div className="h-[160px] w-[160px] animate-pulse rounded-md bg-muted" />}
+              {qrUrl && offerSdp ? <QRCode value={`${qrUrl}&offer=${encodeURIComponent(offerSdp)}`} size={160} /> : <div className="h-[160px] w-[160px] animate-pulse rounded-md bg-muted" />}
             </div>
           </div>
 
