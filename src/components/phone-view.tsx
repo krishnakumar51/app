@@ -47,6 +47,7 @@ export default function PhoneView() {
       return;
     }
     await setRemoteOffer(offerSdp);
+    console.log("clicked on create offer")
     const answer = await createAnswer();
     if (answer?.sdp) {
         setAnswerSdp(answer.sdp);
