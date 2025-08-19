@@ -12,6 +12,9 @@ const ICE_SERVERS = {
   ],
 };
 
+// Store the peer connection instance in a ref outside the component to ensure it persists across renders.
+const pcRef = React.createRef<RTCPeerConnection>();
+
 const useWebRTC = (role: Role) => {
   const { 
     setPeerConnection, setLocalStream, setRemoteStream, 
@@ -19,9 +22,12 @@ const useWebRTC = (role: Role) => {
   } = useStore();
   const { toast } = useToast();
 
-  const pcRef = React.useRef<RTCPeerConnection | null>(null);
-
+  // This function will be responsible for creating and setting up the peer connection.
   const setupPeerConnection = React.useCallback(() => {
+    if (pcRef.current) {
+      return pcRef.current;
+    }
+    
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
     pc.onicecandidate = (event) => {
@@ -56,8 +62,13 @@ const useWebRTC = (role: Role) => {
       });
       setLocalStream(stream);
 
-      const pc = pcRef.current ?? setupPeerConnection();
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      const pc = setupPeerConnection();
+      stream.getTracks().forEach((track) => {
+        if (pc.getSenders().find(s => s.track === track)) {
+          return;
+        }
+        pc.addTrack(track, stream)
+      });
 
     } catch (error) {
       console.error('Error accessing camera:', error);
@@ -70,7 +81,7 @@ const useWebRTC = (role: Role) => {
   }, [setLocalStream, setupPeerConnection, toast]);
 
   const createOffer = React.useCallback(async () => {
-    const pc = pcRef.current ?? setupPeerConnection();
+    const pc = setupPeerConnection();
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     return offer;
@@ -78,7 +89,7 @@ const useWebRTC = (role: Role) => {
 
   const setRemoteOffer = React.useCallback(async (sdp: string) => {
     try {
-      const pc = pcRef.current ?? setupPeerConnection();
+      const pc = setupPeerConnection();
       await pc.setRemoteDescription({ type: 'offer', sdp });
     } catch(e) {
       console.error("Failed to set remote offer", e);
@@ -87,24 +98,24 @@ const useWebRTC = (role: Role) => {
   }, [setupPeerConnection, toast]);
 
   const createAnswer = React.useCallback(async () => {
-    const pc = pcRef.current ?? setupPeerConnection();
+    const pc = setupPeerConnection();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     return answer;
   }, [setupPeerConnection]);
 
   const setRemoteAnswer = React.useCallback(async (sdp: string) => {
-    if (!peerConnection) {
+    if (!pcRef.current) {
         toast({ title: "Connection not initialized", variant: "destructive" });
         return;
     }
     try {
-        await peerConnection.setRemoteDescription({ type: 'answer', sdp });
+        await pcRef.current.setRemoteDescription({ type: 'answer', sdp });
     } catch(e) {
         console.error("Failed to set remote answer", e);
         toast({ title: "Error setting answer", variant: "destructive" });
     }
-  }, [peerConnection, toast]);
+  }, [toast]);
 
   return { startCamera, createOffer, setRemoteOffer, createAnswer, setRemoteAnswer };
 };
