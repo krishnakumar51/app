@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Camera, Copy, Video } from 'lucide-react';
+import { Camera, Copy } from 'lucide-react';
 
 import { useStore } from '@/lib/store';
 import useWebRTC from '@/hooks/use-webrtc';
