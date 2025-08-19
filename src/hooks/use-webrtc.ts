@@ -12,23 +12,25 @@ const ICE_SERVERS = {
   ],
 };
 
-// Store the peer connection instance in a ref outside the component to ensure it persists across renders.
-const pcRef = React.createRef<RTCPeerConnection>();
-
 const useWebRTC = (role: Role) => {
   const { 
-    setPeerConnection, setLocalStream, setRemoteStream, 
-    setConnectionState, peerConnection 
+    setLocalStream, setRemoteStream, 
+    setConnectionState
   } = useStore();
   const { toast } = useToast();
+  // Use useRef to hold the mutable peer connection object.
+  // This instance will persist across re-renders.
+  const pcRef = React.useRef<RTCPeerConnection | null>(null);
 
   // This function will be responsible for creating and setting up the peer connection.
+  // It ensures only one instance is created.
   const setupPeerConnection = React.useCallback(() => {
     if (pcRef.current) {
       return pcRef.current;
     }
     
     const pc = new RTCPeerConnection(ICE_SERVERS);
+    pcRef.current = pc; // Assign to the mutable ref
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -38,21 +40,21 @@ const useWebRTC = (role: Role) => {
     };
 
     pc.onconnectionstatechange = () => {
-      setConnectionState(pc.connectionState);
-      toast({
-        title: "Connection Status",
-        description: `Status changed to: ${pc.connectionState}`,
-      })
+      if (pcRef.current) {
+        setConnectionState(pcRef.current.connectionState);
+        toast({
+          title: "Connection Status",
+          description: `Status changed to: ${pcRef.current.connectionState}`,
+        })
+      }
     };
 
     pc.ontrack = (event) => {
       setRemoteStream(event.streams[0]);
     };
 
-    pcRef.current = pc;
-    setPeerConnection(pc);
     return pc;
-  }, [setConnectionState, setPeerConnection, setRemoteStream, toast]);
+  }, [setConnectionState, setRemoteStream, toast]);
 
   const startCamera = React.useCallback(async () => {
     try {
@@ -99,10 +101,15 @@ const useWebRTC = (role: Role) => {
 
   const createAnswer = React.useCallback(async () => {
     const pc = setupPeerConnection();
+    // Ensure the remote offer is set before creating an answer
+    if (!pc.remoteDescription || pc.remoteDescription.type !== 'offer') {
+        toast({ title: "Remote offer not set", description: "Cannot create an answer without an offer.", variant: "destructive"});
+        return;
+    }
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     return answer;
-  }, [setupPeerConnection]);
+  }, [setupPeerConnection, toast]);
 
   const setRemoteAnswer = React.useCallback(async (sdp: string) => {
     if (!pcRef.current) {
@@ -116,6 +123,16 @@ const useWebRTC = (role: Role) => {
         toast({ title: "Error setting answer", variant: "destructive" });
     }
   }, [toast]);
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+    };
+  }, []);
 
   return { startCamera, createOffer, setRemoteOffer, createAnswer, setRemoteAnswer };
 };
