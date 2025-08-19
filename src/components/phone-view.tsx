@@ -46,12 +46,17 @@ export default function PhoneView() {
       });
       return;
     }
-    await setRemoteOffer(offerSdp);
-    console.log("clicked on create offer")
-    const answer = await createAnswer();
-    if (answer?.sdp) {
-        setAnswerSdp(answer.sdp);
-    }
+  console.log('[PhoneView] handleCreateAnswer: offerSdp length=', offerSdp?.length);
+  await setRemoteOffer(offerSdp);
+  console.log('[PhoneView] handleCreateAnswer: called setRemoteOffer');
+  const answer = await createAnswer();
+  console.log('[PhoneView] handleCreateAnswer: createAnswer returned', !!answer);
+  if (answer?.sdp) {
+    console.log('[PhoneView] handleCreateAnswer: setting answer.sdp length=', answer.sdp.length);
+    setAnswerSdp(answer.sdp);
+  } else {
+    console.warn('[PhoneView] handleCreateAnswer: no answer generated');
+  }
   };
 
   const copyToClipboard = (text: string, type: string) => {
