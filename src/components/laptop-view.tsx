@@ -15,12 +15,14 @@ import MetricsPanel from '@/components/metrics-panel';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LaptopView() {
+  console.log('[LaptopView] Component rendered');
   const { offerSdp, setOfferSdp, answerSdp, setAnswerSdp, connectionState, remoteStream } = useStore();
   const { createOffer, setRemoteAnswer } = useWebRTC('laptop');
   const { toast } = useToast();
   const [qrUrl, setQrUrl] = React.useState('');
 
   React.useEffect(() => {
+    console.log('[LaptopView] useEffect: Initializing QR URL');
     const url = new URL(window.location.href);
     url.searchParams.set('role', 'phone');
     url.searchParams.delete('offer');
@@ -28,11 +30,15 @@ export default function LaptopView() {
   }, []);
 
   const handleCreateOffer = async () => {
+    console.log('[LaptopView] handleCreateOffer called');
     const offer = await createOffer();
+    console.log('[LaptopView] Offer created:', offer);
     setOfferSdp(offer?.sdp ?? '');
+    console.log('[LaptopView] offerSdp set to length:', offer?.sdp?.length);
   };
 
   const handleSetAnswer = async () => {
+    console.log('[LaptopView] handleSetAnswer called');
     if (!answerSdp) {
       toast({
         title: "Error",
@@ -55,6 +61,7 @@ export default function LaptopView() {
   const isConnected = connectionState === 'connected';
 
   if (isConnected && remoteStream) {
+    console.log('[LaptopView] Connected and remote stream available, showing video player');
     return (
       <div className="flex h-[calc(100vh-4rem)] w-full flex-col lg:flex-row">
         <div className="flex-1 p-4">
@@ -98,7 +105,14 @@ export default function LaptopView() {
               <p className="text-center text-sm text-muted-foreground">
                 On your phone, go to this page, select "Phone" role, and scan this QR code.
               </p>
-              {qrUrl && offerSdp ? <QRCode value={`${qrUrl}&offer=${encodeURIComponent(offerSdp)}`} size={160} /> : <div className="h-[160px] w-[160px] animate-pulse rounded-md bg-muted" />}
+              {qrUrl && offerSdp ? (
+                <>
+                  <QRCode value={`${qrUrl}&offer=${encodeURIComponent(offerSdp)}`} size={160} />
+                  <p className="text-xs text-muted-foreground mt-2">Offer SDP length in QR: {offerSdp.length}</p>
+                </>
+              ) : (
+                <div className="h-[160px] w-[160px] animate-pulse rounded-md bg-muted" />
+              )}
             </div>
           </div>
 
