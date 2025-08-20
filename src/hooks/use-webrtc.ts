@@ -57,7 +57,8 @@ const useWebRTC = (role: Role) => {
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pcRef.current = pc; // Assign to the mutable ref
 
-    const seenCandidateTypes = { host: false, srflx: false, relay: false };
+  const seenCandidateTypes = { host: false, srflx: false, relay: false };
+  let relayToastShown = false;
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -93,6 +94,19 @@ const useWebRTC = (role: Role) => {
 
     pc.onicegatheringstatechange = () => {
       console.log('[useWebRTC] ICE gathering state changed to:', pc.iceGatheringState);
+      // When gathering finishes, if no RELAY candidate was discovered, warn the user.
+      if (pc.iceGatheringState === 'complete' && !seenCandidateTypes.relay && !relayToastShown) {
+        relayToastShown = true;
+        const forceRelay = process.env.NEXT_PUBLIC_FORCE_TURN === 'true';
+        toast({
+          title: 'No TURN relay candidate',
+          description: forceRelay
+            ? 'ICE gathering completed but no TURN (relay) candidate was found — TURN may be unreachable or credentials invalid. Connection may fail across NATs.'
+            : 'ICE gathering completed but no TURN (relay) candidate was found. Connection may still work on the same LAN.',
+          variant: 'destructive',
+        });
+        console.warn('[useWebRTC] No RELAY candidate discovered during ICE gathering');
+      }
     };
 
     pc.onconnectionstatechange = () => {
