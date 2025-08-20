@@ -58,6 +58,15 @@ export default function LaptopView() {
       return;
     }
     
+    // Check if we're already in a connecting state
+    if (connectionState === 'connecting') {
+      toast({
+        title: "Connection in Progress",
+        description: "Please wait for the current connection attempt to complete.",
+      });
+      return;
+    }
+    
     await setRemoteAnswer(answerSdp);
   };
   
@@ -165,10 +174,25 @@ export default function LaptopView() {
 
           <div className="flex items-center justify-center space-x-4 rounded-lg border p-4">
             <div className="flex items-center space-x-2">
-              <div className={`h-3 w-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div className={`h-3 w-3 rounded-full ${isConnected ? 'bg-green-500' : connectionState === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'}`} />
               <span className="font-medium">Status:</span>
-              <span className="capitalize text-muted-foreground">{connectionState}</span>
+              <span className="capitalize text-muted-foreground">
+                {connectionState === 'connected' ? 'Connected - Video streaming' : 
+                 connectionState === 'connecting' ? 'Connecting...' : 
+                 connectionState === 'failed' ? 'Connection failed' : 
+                 'Waiting for connection'}
+              </span>
             </div>
+            {isConnected && (
+              <div className="text-sm text-green-600">
+                ✓ Video stream received from phone
+              </div>
+            )}
+            {!isConnected && answerSdp && (
+              <div className="text-sm text-blue-600">
+                ℹ️ Answer SDP received. Click "Set Answer & Connect" to establish connection.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
