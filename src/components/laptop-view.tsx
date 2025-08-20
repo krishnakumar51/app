@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function LaptopView() {
   console.log('[LaptopView] Component rendered');
   const { offerSdp, setOfferSdp, answerSdp, setAnswerSdp, connectionState, remoteStream } = useStore();
-  const { createOffer, setRemoteAnswer } = useWebRTC('laptop');
+  const { createOffer, setRemoteAnswer, startCamera } = useWebRTC('laptop');
   const { toast } = useToast();
   const [qrUrl, setQrUrl] = React.useState('');
 
@@ -27,6 +27,12 @@ export default function LaptopView() {
     url.searchParams.set('role', 'phone');
     url.searchParams.delete('offer');
     setQrUrl(url.toString());
+  }, []);
+
+  React.useEffect(() => {
+    // Ensure camera is started when component mounts to add tracks to peer connection
+    console.log('[LaptopView] useEffect: Calling startCamera');
+    startCamera();
   }, []);
 
   const handleCreateOffer = async () => {

@@ -98,6 +98,20 @@ const useWebRTC = (role: Role) => {
     const offer = await pc.createOffer();
     console.log('[useWebRTC] Setting local description (offer)');
     await pc.setLocalDescription(offer);
+    console.log('[useWebRTC] Waiting for ICE gathering to complete...');
+    await new Promise<void>(resolve => {
+      if (pc.iceGatheringState === 'complete') {
+        resolve();
+      } else {
+        const handler = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', handler);
+            resolve();
+          }
+        };
+        pc.addEventListener('icegatheringstatechange', handler);
+      }
+    });
     console.log('[useWebRTC] Offer created and set as local description', offer);
     return offer;
   }, [setupPeerConnection]);
@@ -128,6 +142,20 @@ const useWebRTC = (role: Role) => {
   const answer = await pc.createAnswer();
   console.log('[useWebRTC] Setting local description (answer)');
   await pc.setLocalDescription(answer);
+  console.log('[useWebRTC] Waiting for ICE gathering to complete...');
+  await new Promise<void>(resolve => {
+    if (pc.iceGatheringState === 'complete') {
+      resolve();
+    } else {
+      const handler = () => {
+        if (pc.iceGatheringState === 'complete') {
+          pc.removeEventListener('icegatheringstatechange', handler);
+          resolve();
+        }
+      };
+      pc.addEventListener('icegatheringstatechange', handler);
+    }
+  });
   console.log('[useWebRTC] Answer created and set as local description', answer);
   console.log('[useWebRTC] createAnswer: generated answer.sdp length=', answer?.sdp?.length);
   return answer;
