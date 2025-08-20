@@ -6,22 +6,29 @@ import { useStore } from '@/lib/store';
 import type { RawMetric, Detection } from '@/lib/types';
 import { detectObjects } from '@/ai/flows/server-object-detection';
 import { MODEL_URL, MODEL_INPUT_SHAPE } from '@/lib/constants';
-import {_} from 'zod';
 
 // Memoize the session to avoid reloading the model on every render
 let session: ort.InferenceSession | null = null;
+let sessionError: string | null = null;
+
 const getSession = async () => {
     if (session) return session;
+    if (sessionError) throw new Error(sessionError);
+    
     try {
+        console.log('[useInference] Loading ONNX model from:', MODEL_URL);
         const newSession = await ort.InferenceSession.create(MODEL_URL, {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all',
         });
         session = newSession;
+        console.log('[useInference] ONNX model loaded successfully');
         return session;
     } catch (e) {
-        console.error("Failed to create ONNX session", e);
-        return null;
+        const errorMsg = `Failed to create ONNX session: ${e}`;
+        console.error(errorMsg);
+        sessionError = errorMsg;
+        throw new Error(errorMsg);
     }
 };
 
@@ -35,43 +42,68 @@ const useInference = (videoRef: React.RefObject<HTMLVideoElement>) => {
     }, []);
 
     const runWasmInference = React.useCallback(async (frame: ImageBitmap) => {
-        const inferenceSession = await getSession();
-        if (!inferenceSession) return [];
+        try {
+            const inferenceSession = await getSession();
+            if (!inferenceSession) {
+                console.warn('[useInference] No inference session available');
+                return [];
+            }
 
-        const { data, width, height } = preprocess(frame);
-        const tensor = new ort.Tensor('float32', data, MODEL_INPUT_SHAPE);
-        const feeds = { images: tensor };
-        
-        const results = await inferenceSession.run(feeds);
-        const detections = postprocess(results.output0.data as Float32Array, width, height);
-
-        return detections;
+            console.log('[useInference] Running WASM inference on frame:', frame.width, 'x', frame.height);
+            const { data, width, height } = preprocess(frame);
+            const tensor = new ort.Tensor('float32', data, MODEL_INPUT_SHAPE);
+            const feeds = { images: tensor };
+            
+            const results = await inferenceSession.run(feeds);
+            const detections = postprocess(results.output0.data as Float32Array, width, height);
+            
+            console.log('[useInference] WASM inference completed, found', detections.length, 'detections');
+            return detections;
+        } catch (error) {
+            console.error('[useInference] WASM inference failed:', error);
+            // Return empty detections on error
+            return [];
+        }
     }, []);
 
     const runServerInference = React.useCallback(async (frame: ImageBitmap) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = frame.width;
-        canvas.height = frame.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return [];
-        ctx.drawImage(frame, 0, 0);
+        try {
+            console.log('[useInference] Running server inference on frame:', frame.width, 'x', frame.height);
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = frame.width;
+            canvas.height = frame.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.warn('[useInference] Could not get canvas context for server inference');
+                return [];
+            }
+            ctx.drawImage(frame, 0, 0);
 
-        const frameDataUri = canvas.toDataURL('image/jpeg', 0.8);
+            const frameDataUri = canvas.toDataURL('image/jpeg', 0.8);
+            console.log('[useInference] Frame converted to data URI, length:', frameDataUri.length);
 
-        const result = await detectObjects({
-            frameDataUri,
-            frameId: Date.now().toString(),
-            captureTs: Date.now(), // This is technically inference request time
-            recvTs: Date.now(), // on server, but we don't know that here
-        });
+            const result = await detectObjects({
+                frameDataUri,
+                frameId: Date.now().toString(),
+                captureTs: Date.now(), // This is technically inference request time
+                recvTs: Date.now(), // on server, but we don't know that here
+            });
 
-        return result.detections.map(d => ({...d, model: 'server'} as Detection));
+            console.log('[useInference] Server inference completed, found', result.detections.length, 'detections');
+            return result.detections.map(d => ({...d, model: 'server' as const}));
+        } catch (error) {
+            console.error('[useInference] Server inference failed:', error);
+            // Return empty detections on error
+            return [];
+        }
     }, []);
 
     React.useEffect(() => {
         const scheduleInference = async () => {
             if (inferenceBusy || !latestFrame) return;
 
+            console.log('[useInference] Starting inference for frame:', latestFrame.width, 'x', latestFrame.height, 'in', mode, 'mode');
             setInferenceBusy(true);
             const frameToProcess = latestFrame;
             setLatestFrame(null); // Consume the frame
@@ -81,21 +113,28 @@ const useInference = (videoRef: React.RefObject<HTMLVideoElement>) => {
             
             try {
                  if (mode === 'wasm') {
+                    console.log('[useInference] Running WASM inference...');
                     newDetections = await runWasmInference(frameToProcess);
                 } else {
+                    console.log('[useInference] Running server inference...');
                     newDetections = await runServerInference(frameToProcess);
                 }
+                
+                console.log('[useInference] Inference completed, got', newDetections.length, 'detections');
             } catch (e) {
-                console.error(`Inference failed in ${mode} mode`, e);
+                console.error(`[useInference] Inference failed in ${mode} mode`, e);
             } finally {
                 frameToProcess.close();
                 const inferenceTs = Date.now();
+                const overlayTs = Date.now();
+                
+                console.log('[useInference] Setting detections and metrics');
                 setDetections(newDetections);
                 
                 const metric: RawMetric = {
                   captureTs,
                   inferenceTs,
-                  overlayTs: Date.now(),
+                  overlayTs,
                 };
                 addRawMetric(metric);
                 
@@ -113,26 +152,30 @@ const useInference = (videoRef: React.RefObject<HTMLVideoElement>) => {
         const video = videoRef.current;
         if (!video) return;
 
+        console.log('[useInference] Setting up frame capture for video:', video.videoWidth, 'x', video.videoHeight);
         let animationFrameId: number;
 
         const captureFrame = async () => {
             if (video.readyState >= 2 && video.videoWidth > 0 && !inferenceBusy) {
                 try {
                     const frame = await createImageBitmap(video);
+                    console.log('[useInference] Captured frame:', frame.width, 'x', frame.height);
                     onNewFrame(frame);
                 } catch(e) {
-                    console.error("Could not create image bitmap", e);
+                    console.error("[useInference] Could not create image bitmap", e);
                 }
             }
             animationFrameId = requestAnimationFrame(captureFrame);
         };
 
         video.onloadedmetadata = () => {
+             console.log('[useInference] Video metadata loaded, starting frame capture');
              animationFrameId = requestAnimationFrame(captureFrame);
         }
         
         return () => {
             if (animationFrameId) {
+                console.log('[useInference] Cleaning up frame capture');
                 cancelAnimationFrame(animationFrameId);
             }
         };
@@ -182,10 +225,10 @@ const COCO_CLASSES = [
 function postprocess(output: Float32Array, originalWidth: number, originalHeight: number): Detection[] {
     const detections: Detection[] = [];
     const [modelWidth, modelHeight] = MODEL_INPUT_SHAPE.slice(2);
-    const boxes = [];
+    const boxes: Array<{label: string, score: number, box: number[]}> = [];
 
     // Transpose the output
-    const outputT = [];
+    const outputT: number[][] = [];
     for(let i=0; i < 84; ++i) { // 84 channels for YOLOv8 (4 box, 80 classes)
         outputT[i] = [];
         for(let j=0; j < 8400; ++j) { // 8400 detections
@@ -194,8 +237,15 @@ function postprocess(output: Float32Array, originalWidth: number, originalHeight
     }
 
     for (let i = 0; i < 8400; i++) {
-        const [x, y, w, h] = outputT.slice(0, 4).map(d => d[i]);
-        const scores = outputT.slice(4, 84).map(d => d[i]);
+        const x = outputT[0]?.[i] || 0;
+        const y = outputT[1]?.[i] || 0;
+        const w = outputT[2]?.[i] || 0;
+        const h = outputT[3]?.[i] || 0;
+        
+        const scores: number[] = [];
+        for(let j = 4; j < 84; j++) {
+            scores.push(outputT[j]?.[i] || 0);
+        }
         
         let maxScore = 0;
         let maxIndex = -1;
@@ -206,14 +256,14 @@ function postprocess(output: Float32Array, originalWidth: number, originalHeight
             }
         }
 
-        if (maxScore > 0.7) { // Confidence threshold
+        if (maxScore > 0.7 && maxIndex >= 0) { // Confidence threshold
             const x1 = ((x - w / 2) / modelWidth) * originalWidth;
             const y1 = ((y - h / 2) / modelHeight) * originalHeight;
             const x2 = ((x + w / 2) / modelWidth) * originalWidth;
             const y2 = ((y + h / 2) / modelHeight) * originalHeight;
 
             boxes.push({
-                label: COCO_CLASSES[maxIndex],
+                label: COCO_CLASSES[maxIndex] || 'unknown',
                 score: maxScore,
                 box: [
                     x1 / originalWidth, y1 / originalHeight, x2 / originalWidth, y2 / originalHeight
@@ -227,7 +277,7 @@ function postprocess(output: Float32Array, originalWidth: number, originalHeight
     const result: {label: string, score: number, box: number[]}[] = [];
     while(boxes.length > 0) {
         result.push(boxes[0]);
-        const newBoxes = [];
+        const newBoxes: typeof boxes = [];
         for(let i = 1; i < boxes.length; i++) {
             if(iou(boxes[0].box, boxes[i].box) < 0.5) {
                 newBoxes.push(boxes[i]);
@@ -243,7 +293,7 @@ function postprocess(output: Float32Array, originalWidth: number, originalHeight
         ymin: r.box[1],
         xmax: r.box[2],
         ymax: r.box[3],
-        model: 'wasm',
+        model: 'wasm' as const,
     }));
 }
 

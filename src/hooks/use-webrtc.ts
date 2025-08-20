@@ -56,6 +56,12 @@ const useWebRTC = (role: Role) => {
       }
     };
 
+    pc.onsignalingstatechange = () => {
+      if (pcRef.current) {
+        console.log('[useWebRTC] Signaling state changed to:', pcRef.current.signalingState);
+      }
+    };
+
     pc.ontrack = (event) => {
       console.log('[useWebRTC] ontrack event received, setting remote stream');
       setRemoteStream(event.streams[0]);
@@ -201,8 +207,26 @@ const useWebRTC = (role: Role) => {
         return;
     }
     try {
+        const pc = pcRef.current;
+        // Guard: if already connected or stable with an answer, do nothing
+        if (pc.connectionState === 'connected') {
+          console.log('[useWebRTC] Already connected; ignoring duplicate answer');
+          toast({ title: 'Already Connected', description: 'The connection is already established.' });
+          return;
+        }
+        if (pc.signalingState === 'stable' && pc.remoteDescription?.type === 'answer') {
+          console.log('[useWebRTC] Signaling state stable and answer already set; skipping');
+          return;
+        }
+        // Validate we have a local offer before setting the answer
+        if (!pc.localDescription || pc.localDescription.type !== 'offer') {
+          console.warn('[useWebRTC] Cannot set answer without a local offer. Current signalingState:', pc.signalingState);
+          toast({ title: 'Offer missing', description: 'Create an offer first, then paste the phone\'s answer.', variant: 'destructive' });
+          return;
+        }
+
         console.log('[useWebRTC] Setting remote description (answer)');
-        await pcRef.current.setRemoteDescription({ type: 'answer', sdp });
+        await pc.setRemoteDescription({ type: 'answer', sdp });
         console.log('[useWebRTC] Remote answer set successfully');
     } catch(e) {
         console.error("Failed to set remote answer", e);

@@ -49,16 +49,21 @@ export default function VideoPlayer() {
   const { detections } = useInference(videoRef);
 
   React.useEffect(() => {
+    console.log('[VideoPlayer] remoteStream changed:', !!remoteStream);
     if (remoteStream && videoRef.current) {
+      console.log('[VideoPlayer] Setting video srcObject, tracks:', remoteStream.getTracks().length);
       videoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
   
   React.useEffect(() => {
     if (canvasRef.current && videoRef.current && videoRef.current.videoWidth > 0) {
+      console.log('[VideoPlayer] Drawing overlay with', detections.length, 'detections');
       drawOverlay(canvasRef.current, videoRef.current, detections);
     }
   }, [detections]);
+
+  console.log('[VideoPlayer] Render - remoteStream:', !!remoteStream, 'detections:', detections.length);
 
   return (
     <div className="relative aspect-video w-full max-w-full overflow-hidden rounded-lg border bg-black shadow-lg">
@@ -68,6 +73,9 @@ export default function VideoPlayer() {
         autoPlay
         playsInline
         className="h-full w-full object-contain"
+        onLoadedMetadata={() => console.log('[VideoPlayer] Video metadata loaded')}
+        onCanPlay={() => console.log('[VideoPlayer] Video can play')}
+        onPlay={() => console.log('[VideoPlayer] Video started playing')}
       />
       <canvas
         ref={canvasRef}

@@ -42,7 +42,10 @@ export const useStore = create<AppState>((set, get) => ({
   setConnectionState: (connectionState) => set({ connectionState }),
 
   detections: [],
-  setDetections: (detections) => set({ detections }),
+  setDetections: (detections) => {
+    console.log('[Store] Setting detections:', detections.length, 'detections');
+    set({ detections });
+  },
 
   metrics: {
     framesProcessed: 0,
