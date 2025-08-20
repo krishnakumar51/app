@@ -94,6 +94,14 @@ const useWebRTC = (role: Role) => {
   const createOffer = React.useCallback(async () => {
     console.log('[useWebRTC] createOffer called');
     const pc = setupPeerConnection();
+    
+    // For laptop (receiver), we need to add a dummy transceiver to ensure proper SDP generation
+    if (role === 'laptop') {
+      console.log('[useWebRTC] Adding receiver transceiver for laptop');
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+    }
+    
     console.log('[useWebRTC] Creating SDP offer...');
     const offer = await pc.createOffer();
     console.log('[useWebRTC] Setting local description (offer)');
@@ -125,7 +133,7 @@ const useWebRTC = (role: Role) => {
     await iceGatheringPromise;
     console.log('[useWebRTC] Offer created and set as local description', offer);
     return offer;
-  }, [setupPeerConnection]);
+  }, [setupPeerConnection, role]);
 
   const setRemoteOffer = React.useCallback(async (sdp: string) => {
     try {

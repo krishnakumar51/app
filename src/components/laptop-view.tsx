@@ -33,6 +33,7 @@ export default function LaptopView() {
     console.log('[LaptopView] handleCreateOffer called');
     const offer = await createOffer();
     console.log('[LaptopView] Offer created:', offer);
+    console.log('[LaptopView] Full SDP content:', offer?.sdp);
     setOfferSdp(offer?.sdp ?? '');
     console.log('[LaptopView] offerSdp set to length:', offer?.sdp?.length);
   };

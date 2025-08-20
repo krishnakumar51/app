@@ -27,6 +27,7 @@ export default function PhoneView() {
 
   const handleCreateAnswer = async () => {
     console.log('[PhoneView] handleCreateAnswer called');
+    console.log('[PhoneView] Received offerSdp:', offerSdp);
     if (!offerSdp) {
       toast({
         title: "Error",
