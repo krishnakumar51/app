@@ -5,11 +5,29 @@ import { useStore } from '@/lib/store';
 import type { Role } from '@/lib/types';
 import { useToast } from './use-toast';
 
-const ICE_SERVERS = {
+const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+    // Prefer TURN if provided via env (NEXT_PUBLIC_* so it is available client-side)
+    ...(process.env.NEXT_PUBLIC_TURN_URL
+      ? [
+          {
+            urls: process.env.NEXT_PUBLIC_TURN_URL.split(',').map((u) => u.trim()),
+            username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+            credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+          } as RTCIceServer,
+        ]
+      : [
+          // Fallback to a public relay for demos. For production, provide your own TURN.
+          { urls: ['stun:stun.openrelay.metered.ca:80'] },
+          {
+            urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'],
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+          },
+        ]),
   ],
+  iceTransportPolicy: process.env.NEXT_PUBLIC_FORCE_TURN === 'true' ? 'relay' : 'all',
 };
 
 const useWebRTC = (role: Role) => {
@@ -33,14 +51,48 @@ const useWebRTC = (role: Role) => {
     }
     
     console.log('[useWebRTC] Creating new RTCPeerConnection');
+    const hasCustomTurn = Boolean(process.env.NEXT_PUBLIC_TURN_URL);
+    const forceRelay = process.env.NEXT_PUBLIC_FORCE_TURN === 'true';
+    console.log('[useWebRTC] ICE config -> hasCustomTurn:', hasCustomTurn, 'forceRelay:', forceRelay);
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pcRef.current = pc; // Assign to the mutable ref
+
+    const seenCandidateTypes = { host: false, srflx: false, relay: false };
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         // In a real app, this would be sent to the other peer via signaling server
         console.log('[useWebRTC] New ICE candidate:', JSON.stringify(event.candidate));
+
+        // Candidate type diagnostics
+        const cand = event.candidate.candidate || '';
+        if (cand.includes(' typ relay')) {
+          if (!seenCandidateTypes.relay) {
+            console.log('[useWebRTC] First RELAY candidate discovered (TURN reachable)');
+          }
+          seenCandidateTypes.relay = true;
+        } else if (cand.includes(' typ srflx')) {
+          if (!seenCandidateTypes.srflx) console.log('[useWebRTC] First SRFLX candidate discovered (STUN reflexive)');
+          seenCandidateTypes.srflx = true;
+        } else if (cand.includes(' typ host')) {
+          if (!seenCandidateTypes.host) console.log('[useWebRTC] First HOST candidate discovered (local network)');
+          seenCandidateTypes.host = true;
+        }
       }
+    };
+
+    pc.onicecandidateerror = (event: RTCPeerConnectionIceErrorEvent) => {
+      console.error('[useWebRTC] ICE candidate error:', {
+        address: event.address,
+        port: event.port,
+        url: (event as any).url,
+        errorCode: event.errorCode,
+        errorText: event.errorText,
+      });
+    };
+
+    pc.onicegatheringstatechange = () => {
+      console.log('[useWebRTC] ICE gathering state changed to:', pc.iceGatheringState);
     };
 
     pc.onconnectionstatechange = () => {

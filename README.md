@@ -40,6 +40,42 @@ The application will be available at `http://localhost:9002`.
 
 ---
 
+### Hosted Deployment (Vercel) and TURN
+
+WebRTC needs STUN/TURN to traverse NAT/firewalls. When deploying to Vercel (or any cloud), provide a TURN server to ensure connectivity:
+
+1. Provision a TURN service (e.g., Twilio/Nimbus/your coturn).
+2. Set these environment variables in Vercel (Project Settings → Environment Variables):
+
+```
+NEXT_PUBLIC_TURN_URL=turns:your-turn-host:443?transport=tcp,turn:your-turn-host:3478
+NEXT_PUBLIC_TURN_USERNAME=your-username
+NEXT_PUBLIC_TURN_CREDENTIAL=your-credential
+# Optional: force TURN-only for strict networks
+NEXT_PUBLIC_FORCE_TURN=true
+```
+
+If you don't set these, the app falls back to public demo relays which may be rate-limited or unreliable. For production, always use your own TURN.
+
+---
+
+### Local Development with TURN
+
+Create a `.env.local` at the project root (not committed) with your TURN credentials to test locally:
+
+```
+NEXT_PUBLIC_TURN_URL=turns:your-turn-host:443?transport=tcp,turn:your-turn-host:3478
+NEXT_PUBLIC_TURN_USERNAME=your-username
+NEXT_PUBLIC_TURN_CREDENTIAL=your-credential
+NEXT_PUBLIC_FORCE_TURN=false
+```
+
+Restart `npm run dev` after changing envs.
+
+Tip: If your network blocks UDP, set `NEXT_PUBLIC_FORCE_TURN=true` to use TCP/TLS relay only.
+
+---
+
 ## 3. How to Use
 
 ### Phone Setup (Sender)
