@@ -29,14 +29,9 @@ export default function LaptopView() {
     setQrUrl(url.toString());
   }, []);
 
-  React.useEffect(() => {
-    // Ensure camera is started when component mounts to add tracks to peer connection
-    console.log('[LaptopView] useEffect: Calling startCamera');
-    startCamera();
-  }, []);
-
   const handleCreateOffer = async () => {
     console.log('[LaptopView] handleCreateOffer called');
+    await startCamera();
     const offer = await createOffer();
     console.log('[LaptopView] Offer created:', offer);
     setOfferSdp(offer?.sdp ?? '');
