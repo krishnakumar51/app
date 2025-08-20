@@ -133,13 +133,38 @@ const useWebRTC = (role: Role) => {
       setLocalStream(stream);
 
       const pc = setupPeerConnection();
-      stream.getTracks().forEach((track) => {
-        if (pc.getSenders().find(s => s.track === track)) {
-          return;
+      // For the 'phone' role (answerer), avoid adding tracks immediately to prevent m-line reordering.
+      if (role !== 'phone') {
+        stream.getTracks().forEach((track) => {
+          if (pc.getSenders().find(s => s.track === track)) return;
+          console.log('[useWebRTC] Adding track to peer connection:', track.kind);
+          pc.addTrack(track, stream);
+        });
+      } else {
+        // If remote offer is already present, attach tracks in a way that preserves m-line order.
+        if (pc.remoteDescription && pc.remoteDescription.type === 'offer') {
+          const transceivers = pc.getTransceivers();
+          stream.getTracks().forEach((track) => {
+            let attached = false;
+            for (const tr of transceivers) {
+              try {
+                // Prefer reusing transceivers of same kind
+                if (tr.receiver && tr.receiver.track && tr.receiver.track.kind === track.kind && tr.sender && !tr.sender.track) {
+                  tr.sender.replaceTrack(track as MediaStreamTrack);
+                  tr.direction = 'sendrecv';
+                  attached = true;
+                  break;
+                }
+              } catch (e) {
+                // ignore and continue
+              }
+            }
+            if (!attached) {
+              pc.addTrack(track, stream);
+            }
+          });
         }
-        console.log('[useWebRTC] Adding track to peer connection:', track);
-        pc.addTrack(track, stream)
-      });
+      }
 
     } catch (error) {
       console.error('Error accessing camera:', error);
@@ -149,7 +174,7 @@ const useWebRTC = (role: Role) => {
         variant: "destructive",
       })
     }
-  }, [setLocalStream, setupPeerConnection, toast]);
+  }, [setLocalStream, setupPeerConnection, toast, role]);
 
   const createOffer = React.useCallback(async () => {
     console.log('[useWebRTC] createOffer called');
@@ -197,10 +222,49 @@ const useWebRTC = (role: Role) => {
 
   const setRemoteOffer = React.useCallback(async (sdp: string) => {
     try {
-  const pc = setupPeerConnection();
-  console.log('[useWebRTC] setRemoteOffer: incoming offer length=', sdp?.length);
-  await pc.setRemoteDescription({ type: 'offer', sdp });
-  console.log('[useWebRTC] setRemoteOffer: pc.remoteDescription.type=', pc.remoteDescription?.type, 'pc.remoteDescription.sdpLength=', pc.remoteDescription?.sdp?.length);
+      // Ensure we start fresh for every incoming offer to avoid transceiver/order mismatches
+      if (pcRef.current) {
+        console.log('[useWebRTC] Closing existing peer connection before applying new remote offer');
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+
+      const pc = setupPeerConnection();
+      console.log('[useWebRTC] setRemoteOffer: incoming offer length=', sdp?.length);
+      await pc.setRemoteDescription({ type: 'offer', sdp });
+      console.log('[useWebRTC] setRemoteOffer: pc.remoteDescription.type=', pc.remoteDescription?.type, 'pc.remoteDescription.sdpLength=', pc.remoteDescription?.sdp?.length);
+
+      // If we already have a local stream (camera started), attach tracks now in a way that
+      // preserves the m-line/transceiver ordering coming from the offer.
+      const localStream = (useStore as any).getState ? (useStore as any).getState().localStream : undefined;
+      if (localStream) {
+        const transceivers = pc.getTransceivers();
+        localStream.getTracks().forEach((track: MediaStreamTrack) => {
+          let attached = false;
+          for (const tr of transceivers) {
+            try {
+              // If transceiver receiver exists and its kind matches, reuse it
+              if (tr.receiver && tr.receiver.track && tr.receiver.track.kind === track.kind) {
+                if (tr.sender) {
+                  try {
+                    tr.sender.replaceTrack(track);
+                  } catch (e) {
+                    // ignore replaceTrack errors
+                  }
+                  tr.direction = 'sendrecv';
+                  attached = true;
+                  break;
+                }
+              }
+            } catch (e) {
+              // continue
+            }
+          }
+          if (!attached) {
+            pc.addTrack(track, localStream);
+          }
+        });
+      }
     } catch(e) {
       console.error("Failed to set remote offer", e);
       toast({ title: "Error setting offer", variant: "destructive" });
