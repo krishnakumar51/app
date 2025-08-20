@@ -46,6 +46,8 @@ const useWebRTC = (role: Role) => {
     pc.onconnectionstatechange = () => {
       if (pcRef.current) {
         console.log('[useWebRTC] Connection state changed to:', pcRef.current.connectionState);
+        console.log('[useWebRTC] ICE connection state:', pcRef.current.iceConnectionState);
+        console.log('[useWebRTC] ICE gathering state:', pcRef.current.iceGatheringState);
         setConnectionState(pcRef.current.connectionState);
         toast({
           title: "Connection Status",
@@ -126,7 +128,7 @@ const useWebRTC = (role: Role) => {
           pc.removeEventListener('icegatheringstatechange', handler);
           console.warn('[useWebRTC] ICE gathering timeout, proceeding with current state');
           resolve();
-        }, 10000);
+        }, 15000);
       }
     });
     
@@ -181,7 +183,7 @@ const useWebRTC = (role: Role) => {
         pc.removeEventListener('icegatheringstatechange', handler);
         console.warn('[useWebRTC] ICE gathering timeout, proceeding with current state');
         resolve();
-      }, 10000);
+      }, 15000);
     }
   });
   

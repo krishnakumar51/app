@@ -48,6 +48,16 @@ export default function LaptopView() {
       });
       return;
     }
+    
+    // Prevent setting the same answer multiple times
+    if (connectionState === 'connected') {
+      toast({
+        title: "Already Connected",
+        description: "Connection is already established.",
+      });
+      return;
+    }
+    
     await setRemoteAnswer(answerSdp);
   };
   
@@ -135,6 +145,22 @@ export default function LaptopView() {
             <Button onClick={handleSetAnswer} className="w-full" disabled={!answerSdp}>
               Set Answer & Connect
             </Button>
+            {connectionState === 'connected' && (
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setAnswerSdp('');
+                  setOfferSdp('');
+                  toast({
+                    title: "Connection Reset",
+                    description: "Connection has been reset. Generate a new offer to reconnect.",
+                  });
+                }}
+                className="w-full"
+              >
+                Reset Connection
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center justify-center space-x-4 rounded-lg border p-4">

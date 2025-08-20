@@ -36,6 +36,16 @@ export default function PhoneView() {
       });
       return;
     }
+    
+    // Prevent creating multiple answers
+    if (answerSdp) {
+      toast({
+        title: "Answer Already Generated",
+        description: "Answer SDP has already been generated. Copy it to the laptop.",
+      });
+      return;
+    }
+    
   console.log('[PhoneView] handleCreateAnswer: offerSdp length=', offerSdp?.length);
   await setRemoteOffer(offerSdp);
   console.log('[PhoneView] handleCreateAnswer: called setRemoteOffer');
@@ -124,6 +134,22 @@ export default function PhoneView() {
               <Button onClick={handleCreateAnswer} className="w-full" disabled={!offerSdp}>
                 Create Answer
               </Button>
+              {answerSdp && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setAnswerSdp('');
+                    setOfferSdp('');
+                    toast({
+                      title: "Connection Reset",
+                      description: "Connection has been reset. Paste a new offer to reconnect.",
+                    });
+                  }}
+                  className="w-full"
+                >
+                  Reset Connection
+                </Button>
+              )}
               <div className="relative">
                 <Textarea
                   value={answerSdp}
