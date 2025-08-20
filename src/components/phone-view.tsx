@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Camera, Copy } from 'lucide-react';
 
 import { useStore } from '@/lib/store';
@@ -17,7 +16,6 @@ export default function PhoneView() {
   const { localStream, offerSdp, setOfferSdp, answerSdp, setAnswerSdp, connectionState } = useStore();
   const { startCamera, createAnswer, setRemoteOffer } = useWebRTC('phone');
   const localVideoRef = React.useRef<HTMLVideoElement>(null);
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -26,20 +24,6 @@ export default function PhoneView() {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
-
-  React.useEffect(() => {
-    console.log('[PhoneView] useEffect: searchParams changed');
-    const offerFromUrl = searchParams.get('offer');
-    if (offerFromUrl) {
-      console.log('[PhoneView] Offer found in URL');
-      const decodedOffer = decodeURIComponent(offerFromUrl);
-      setOfferSdp(decodedOffer);
-      toast({
-        title: "Offer Received",
-        description: "Offer SDP has been populated from the URL.",
-      })
-    }
-  }, [searchParams, setOfferSdp, toast]);
 
   const handleCreateAnswer = async () => {
     console.log('[PhoneView] handleCreateAnswer called');
@@ -118,7 +102,7 @@ export default function PhoneView() {
           <div className="space-y-4">
               <h3 className="font-semibold">Step 1: Get Offer from Laptop</h3>
               <p className="text-sm text-muted-foreground">
-                Scan the QR code on the laptop screen or paste the Offer SDP below.
+                Copy the Offer SDP from the laptop screen and paste it below.
               </p>
               <div className="relative">
                 <Textarea

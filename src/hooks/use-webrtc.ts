@@ -99,7 +99,9 @@ const useWebRTC = (role: Role) => {
     console.log('[useWebRTC] Setting local description (offer)');
     await pc.setLocalDescription(offer);
     console.log('[useWebRTC] Waiting for ICE gathering to complete...');
-    await new Promise<void>(resolve => {
+    
+    // Add timeout for ICE gathering
+    const iceGatheringPromise = new Promise<void>((resolve, reject) => {
       if (pc.iceGatheringState === 'complete') {
         resolve();
       } else {
@@ -110,8 +112,17 @@ const useWebRTC = (role: Role) => {
           }
         };
         pc.addEventListener('icegatheringstatechange', handler);
+        
+        // Add timeout after 10 seconds
+        setTimeout(() => {
+          pc.removeEventListener('icegatheringstatechange', handler);
+          console.warn('[useWebRTC] ICE gathering timeout, proceeding with current state');
+          resolve();
+        }, 10000);
       }
     });
+    
+    await iceGatheringPromise;
     console.log('[useWebRTC] Offer created and set as local description', offer);
     return offer;
   }, [setupPeerConnection]);
@@ -143,7 +154,9 @@ const useWebRTC = (role: Role) => {
   console.log('[useWebRTC] Setting local description (answer)');
   await pc.setLocalDescription(answer);
   console.log('[useWebRTC] Waiting for ICE gathering to complete...');
-  await new Promise<void>(resolve => {
+  
+  // Add timeout for ICE gathering
+  const iceGatheringPromise = new Promise<void>((resolve, reject) => {
     if (pc.iceGatheringState === 'complete') {
       resolve();
     } else {
@@ -154,8 +167,17 @@ const useWebRTC = (role: Role) => {
         }
       };
       pc.addEventListener('icegatheringstatechange', handler);
+      
+      // Add timeout after 10 seconds
+      setTimeout(() => {
+        pc.removeEventListener('icegatheringstatechange', handler);
+        console.warn('[useWebRTC] ICE gathering timeout, proceeding with current state');
+        resolve();
+      }, 10000);
     }
   });
+  
+  await iceGatheringPromise;
   console.log('[useWebRTC] Answer created and set as local description', answer);
   console.log('[useWebRTC] createAnswer: generated answer.sdp length=', answer?.sdp?.length);
   return answer;

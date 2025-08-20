@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function LaptopView() {
   console.log('[LaptopView] Component rendered');
   const { offerSdp, setOfferSdp, answerSdp, setAnswerSdp, connectionState, remoteStream } = useStore();
-  const { createOffer, setRemoteAnswer, startCamera } = useWebRTC('laptop');
+  const { createOffer, setRemoteAnswer } = useWebRTC('laptop');
   const { toast } = useToast();
   const [qrUrl, setQrUrl] = React.useState('');
 
@@ -31,7 +31,6 @@ export default function LaptopView() {
 
   const handleCreateOffer = async () => {
     console.log('[LaptopView] handleCreateOffer called');
-    await startCamera();
     const offer = await createOffer();
     console.log('[LaptopView] Offer created:', offer);
     setOfferSdp(offer?.sdp ?? '');
@@ -108,8 +107,9 @@ export default function LaptopView() {
               </p>
               {qrUrl && offerSdp ? (
                 <>
-                  <QRCode value={`${qrUrl}&offer=${encodeURIComponent(offerSdp)}`} size={160} />
-                  <p className="text-xs text-muted-foreground mt-2">Offer SDP length in QR: {offerSdp.length}</p>
+                  <QRCode value={qrUrl} size={160} />
+                  <p className="text-xs text-muted-foreground mt-2">Offer SDP length: {offerSdp.length}</p>
+                  <p className="text-xs text-muted-foreground">Copy the Offer SDP below and paste it on the phone</p>
                 </>
               ) : (
                 <div className="h-[160px] w-[160px] animate-pulse rounded-md bg-muted" />
