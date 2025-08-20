@@ -103,7 +103,7 @@ The output file will have the following structure:
   "median_e2e_ms": 123,
   "p95_e2e_ms": 290,
   "median_inference_ms": 78,
-  "p95_inference_ms": 150
+  "p95_inference_ms": 150,
 }
 ```
 
