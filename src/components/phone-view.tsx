@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 
 export default function PhoneView() {
+  console.log('[PhoneView] Component rendered');
   const { localStream, offerSdp, setOfferSdp, answerSdp, setAnswerSdp, connectionState } = useStore();
   const { startCamera, createAnswer, setRemoteOffer } = useWebRTC('phone');
   const localVideoRef = React.useRef<HTMLVideoElement>(null);
@@ -20,14 +21,17 @@ export default function PhoneView() {
   const { toast } = useToast();
 
   React.useEffect(() => {
+    console.log('[PhoneView] useEffect: localStream changed', !!localStream);
     if (localStream && localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
 
   React.useEffect(() => {
+    console.log('[PhoneView] useEffect: searchParams changed');
     const offerFromUrl = searchParams.get('offer');
     if (offerFromUrl) {
+      console.log('[PhoneView] Offer found in URL');
       const decodedOffer = decodeURIComponent(offerFromUrl);
       setOfferSdp(decodedOffer);
       toast({
@@ -38,6 +42,7 @@ export default function PhoneView() {
   }, [searchParams, setOfferSdp, toast]);
 
   const handleCreateAnswer = async () => {
+    console.log('[PhoneView] handleCreateAnswer called');
     if (!offerSdp) {
       toast({
         title: "Error",
@@ -68,6 +73,7 @@ export default function PhoneView() {
   };
 
   if (!localStream) {
+    console.log('[PhoneView] No local stream, showing start camera button');
     return (
       <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
         <Card className="max-w-sm">
@@ -86,6 +92,7 @@ export default function PhoneView() {
     );
   }
 
+  console.log('[PhoneView] Local stream available, showing connection view');
   return (
     <div className="container mx-auto max-w-4xl p-4 md:p-6">
       <Card>
