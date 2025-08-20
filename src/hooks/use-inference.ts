@@ -16,6 +16,23 @@ const getSession = async () => {
     if (sessionError) throw new Error(sessionError);
     
     try {
+        console.log('[useInference] Checking ONNX model availability at:', MODEL_URL);
+        // Check that the model file is present and reachable before creating session.
+        try {
+            const res = await fetch(MODEL_URL, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = `ONNX model not found at ${MODEL_URL} (status ${res.status})`;
+                console.error('[useInference]', msg);
+                sessionError = msg;
+                throw new Error(msg);
+            }
+        } catch (fetchErr) {
+            const msg = `Failed to fetch ONNX model at ${MODEL_URL}: ${fetchErr}`;
+            console.error('[useInference]', msg);
+            sessionError = msg;
+            throw new Error(msg);
+        }
+
         console.log('[useInference] Loading ONNX model from:', MODEL_URL);
         const newSession = await ort.InferenceSession.create(MODEL_URL, {
             executionProviders: ['wasm'],
